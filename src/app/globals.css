@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Space Grotesk", "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-steel: #eef1f4;
+  --color-surface: #ffffff;
+  --color-ink: #0e1520;
+  --color-muted: #5b6672;
+  --color-rule: #d8dee6;
+  --color-accent: #0b7a5a;
+  --color-accent-soft: #e3f4ee;
+  --color-pending: #b26a00;
+  --color-pending-soft: #faf0e0;
+  --color-alert: #b3261e;
+  --color-alert-soft: #fbeae9;
+  --color-void: #3a3f48;
+  --color-void-soft: #eef0f3;
+
+  --color-dark-steel: #0d1117;
+  --color-dark-surface: #161b22;
+  --color-dark-ink: #e6eaef;
+  --color-dark-muted: #96a1ad;
+  --color-dark-rule: #2a323c;
+  --color-dark-accent: #4cc89b;
+  --color-dark-accent-soft: rgba(76, 200, 155, 0.14);
+  --color-dark-pending: #e0a34a;
+  --color-dark-pending-soft: rgba(224, 163, 74, 0.14);
+  --color-dark-alert: #f07167;
+  --color-dark-alert-soft: rgba(240, 113, 103, 0.14);
+  --color-dark-void: #8a94a0;
+  --color-dark-void-soft: rgba(138, 148, 160, 0.14);
+}
+
+.dark {
+  --color-steel: var(--color-dark-steel);
+  --color-surface: var(--color-dark-surface);
+  --color-ink: var(--color-dark-ink);
+  --color-muted: var(--color-dark-muted);
+  --color-rule: var(--color-dark-rule);
+  --color-accent: var(--color-dark-accent);
+  --color-accent-soft: var(--color-dark-accent-soft);
+  --color-pending: var(--color-dark-pending);
+  --color-pending-soft: var(--color-dark-pending-soft);
+  --color-alert: var(--color-dark-alert);
+  --color-alert-soft: var(--color-dark-alert-soft);
+  --color-void: var(--color-dark-void);
+  --color-void-soft: var(--color-dark-void-soft);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-steel);
+  background-image: radial-gradient(
+    circle at 100% 0%,
+    color-mix(in srgb, var(--color-accent) 6%, transparent),
+    transparent 45%
+  );
+  background-attachment: fixed;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+/* subtle entrance for freshly pushed feed items */
+@keyframes settle {
+  from {
+    background-color: var(--color-accent-soft);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.push-anim {
+  animation: settle 1.4s ease-out;
+}
+
+/* thin custom scrollbars for the feed/nav areas */
+.nice-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.nice-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-rule);
+  border-radius: 999px;
+}
+.nice-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
