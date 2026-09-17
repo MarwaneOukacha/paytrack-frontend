@@ -1,11 +1,6 @@
-import { Rocket } from "lucide-react";
-
 export const dynamicParams = false;
 
-const MODULES: Record<
-  string,
-  { title: string; desc: string }
-> = {
+const MODULES: Record<string, { title: string; desc: string }> = {
   cards: {
     title: "Cartes bancaires",
     desc: "Émission, activation et plafonds de cartes liées à un compte PayTrack.",
@@ -14,6 +9,14 @@ const MODULES: Record<
     title: "Produits",
     desc: "Catalogue des produits financiers proposés et leurs règles.",
   },
+  "fraud-rules": {
+    title: "Règles de fraude",
+    desc: "Seuils, fenêtres glissantes et actions automatiques par type de compte.",
+  },
+  limits: {
+    title: "Plafonds & configs compte",
+    desc: "Plafonds de paiement, devises autorisées, paramètres par défaut à l'ouverture.",
+  },
   integrations: {
     title: "Intégrations",
     desc: "Connexions vers les systèmes bancaires externes : ISO 20022, USSD, SMPP.",
@@ -21,6 +24,10 @@ const MODULES: Record<
   settings: {
     title: "Paramètres",
     desc: "Seuils de fraude, plafonds de paiement, origines autorisées.",
+  },
+  logs: {
+    title: "Journaux API",
+    desc: "Historique des appels REST vers payment-service et fraud-service.",
   },
 };
 
@@ -34,14 +41,11 @@ export default async function SoonPage({ params }: { params: Promise<{ slug: str
   if (!mod) return null;
 
   return (
-    <div className="flex items-center justify-center py-24">
-      <div className="w-full max-w-md border border-rule bg-surface px-6 py-14 text-center">
-        <span className="mx-auto grid size-12 place-items-center rounded-full border border-rule">
-          <Rocket size={20} className="text-muted" />
-        </span>
-        <p className="mt-4 text-xs font-medium uppercase tracking-widest text-muted">Bientôt</p>
-        <h1 className="mt-2 text-xl font-bold tracking-tight">{mod.title}</h1>
-        <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-muted">{mod.desc}</p>
+    <div className="card">
+      <div className="soon-page">
+        <span className="eyebrow">Bientôt</span>
+        <h1>{mod.title}</h1>
+        <p className="desc">{mod.desc}</p>
       </div>
     </div>
   );

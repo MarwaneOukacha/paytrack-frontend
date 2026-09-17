@@ -11,9 +11,9 @@ interface PanelProps {
 
 export function Panel({ children, title, aside, className, bodyClassName }: PanelProps) {
   return (
-    <div className={clsx("border border-rule bg-surface", className)}>
+    <div className={clsx("overflow-hidden rounded-[18px] bg-card shadow-card", className)}>
       {(title || aside) && (
-        <div className="flex items-center justify-between gap-3 border-b border-rule px-4 py-3">
+        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>{title}</div>
           {aside}
         </div>

@@ -12,32 +12,19 @@ export function PaymentFeed() {
   return (
     <Panel
       className="flex flex-col"
-      title={<h2 className="text-sm font-medium">Flux en temps réel</h2>}
-      aside={
-        <span className="font-mono text-xs text-muted">
-          {items.length} événements
-        </span>
-      }
-      bodyClassName="flex-1"
+      title={<span className="text-[15px] font-bold tracking-tight">Flux en temps réel</span>}
+      aside={<span className="mono text-xs text-muted">{items.length} événements</span>}
+      bodyClassName="flex-1 pb-2"
     >
       {items.length === 0 ? (
         <p className="px-4 py-10 text-center text-sm text-muted">En attente d&apos;événements…</p>
       ) : (
-        <ul className="nice-scroll max-h-[420px] overflow-y-auto">
+        <ul className="feed nice-scroll max-h-[430px] overflow-y-auto">
           {items.map((it, idx) => (
-            <li
-              key={it.ref}
-              className={
-                idx === 0
-                  ? "push-anim flex items-center gap-3 border-t border-rule px-4 py-2.5 text-sm first:border-t-0"
-                  : "flex items-center gap-3 border-t border-rule px-4 py-2.5 text-sm first:border-t-0"
-              }
-            >
-              <span className="hidden shrink-0 font-mono text-xs text-muted sm:inline">
-                {it.time}
-              </span>
-              <span className="shrink-0 font-mono text-sm">{it.acc}</span>
-              <span className="ml-auto shrink-0 font-mono tabular-nums">
+            <li key={it.ref} className={idx === 0 ? "new" : undefined}>
+              <span className="mono text-xs text-muted">{it.time}</span>
+              <span className="mono text-[13.5px]">{it.acc}</span>
+              <span className="mono ml-auto text-[13.5px] font-semibold tabular-nums">
                 {fmtMAD(it.amt)} MAD
               </span>
               <StatusBadge status={it.status} />

@@ -22,10 +22,9 @@ export function ThemeToggle() {
       type="button"
       onClick={() => setDark((d) => !d)}
       aria-label={dark ? "Activer le thème clair" : "Activer le thème sombre"}
-      className="inline-flex items-center gap-2 rounded border border-rule bg-transparent px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:border-ink hover:text-ink"
+      className="grid size-9 place-items-center rounded-full border border-line text-muted transition-colors hover:border-faint hover:text-ink"
     >
-      {dark ? <Sun size={14} /> : <Moon size={14} />}
-      <span className="hidden sm:inline">{dark ? "Clair" : "Sombre"}</span>
+      {dark ? <Sun size={15} /> : <Moon size={15} />}
     </button>
   );
 }
