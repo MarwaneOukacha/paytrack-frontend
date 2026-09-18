@@ -9,6 +9,8 @@ const STYLES: Record<PaymentStatus, string> = {
   PROCESSED: "badge-PROCESSED",
   FAILED: "badge-FAILED",
   FRAUD: "badge-FRAUD",
+  REJECTED: "badge-FAILED",
+  COMPLETED: "badge-PROCESSED",
   DLT: "badge-DLT",
 };
 

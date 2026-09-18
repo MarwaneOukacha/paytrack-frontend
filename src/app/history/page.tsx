@@ -7,7 +7,16 @@ import { StatusBadge } from "@/components/status-badge";
 import { fmtMAD } from "@/lib/format";
 import type { PaymentStatus } from "@/lib/types";
 
-const STATUS_OPTIONS: Array<PaymentStatus | ""> = ["", "PENDING", "PROCESSED", "FAILED", "FRAUD", "DLT"];
+const STATUS_OPTIONS: Array<PaymentStatus | ""> = [
+  "",
+  "PENDING",
+  "PROCESSED",
+  "COMPLETED",
+  "FAILED",
+  "FRAUD",
+  "REJECTED",
+  "DLT",
+];
 const PAGE_SIZE = 10;
 
 export default function HistoryPage() {

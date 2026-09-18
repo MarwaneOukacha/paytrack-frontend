@@ -21,7 +21,7 @@ export function StatusDonut() {
     DLT: 0,
   };
   history.forEach((p) => {
-    if (p.status === "PROCESSED") counts.PROCESSED++;
+    if (p.status === "PROCESSED" || p.status === "COMPLETED") counts.PROCESSED++;
     else if (p.status === "PENDING") counts.PENDING++;
     else if (p.status === "DLT") counts.DLT++;
     else counts.REJECT++;

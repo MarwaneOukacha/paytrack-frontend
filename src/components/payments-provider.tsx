@@ -9,18 +9,56 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  PAYMENTS_STREAM_URL,
+  api,
+  type AccountDto,
+  type FraudEvaluationDto,
+  type PaymentDto,
+} from "@/lib/api";
 import type { Account, Figures, FraudAlert, Payment, PaymentStatus } from "@/lib/types";
 
-const now = () =>
-  new Date().toLocaleTimeString("fr-MA", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+const EMPTY_FIGURES: Figures = { count: 0, amount: 0, fraud: 0, dlt: 0 };
+const FEED_LIMIT = 14;
+const HISTORY_LIMIT = 200;
 
-const mkRef = () => Math.random().toString(16).slice(2, 10);
+const num = (v: number | string | null | undefined) => (v == null ? 0 : Number(v));
 
-const BASE_FIGURES: Figures = { count: 128, amount: 54320, fraud: 2, dlt: 1 };
+const fmtTime = (iso?: string) =>
+  iso
+    ? new Date(iso).toLocaleTimeString("fr-MA", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+    : "";
+
+const toAccount = (a: AccountDto): Account => ({
+  id: a.accountNumber,
+  uuid: a.id,
+  holder: a.ownerName,
+  email: a.ownerEmail,
+  currency: a.currency,
+  balance: num(a.balance),
+  status: a.status,
+});
+
+const toPayment = (p: PaymentDto): Payment => ({
+  ref: p.id,
+  acc: p.accountId,
+  amt: num(p.amount),
+  status: p.status,
+  desc: p.description,
+  time: fmtTime(p.createdAt),
+  ts: p.createdAt ? new Date(p.createdAt).getTime() : Date.now(),
+});
+
+const toAlert = (e: FraudEvaluationDto): FraudAlert => ({
+  acc: e.accountId,
+  ref: e.paymentId,
+  time: new Date(e.evaluatedAt).toLocaleString("fr-MA"),
+  reason: e.reason ?? "Transaction rejetée par la règle de fraude",
+});
 
 interface PaymentStore {
   accounts: Account[];
@@ -29,188 +67,205 @@ interface PaymentStore {
   alerts: FraudAlert[];
   figures: Figures;
   banner: string | null;
+  ready: boolean;
   clearBanner: () => void;
-  sendPayment: (acc: string, amt: number, desc: string) => void;
-  burstFraud: () => void;
-  openAccount: (holder: string, balance: number, id?: string) => void;
-  toggleAccount: (id: string) => void;
-  unblockAll: (acc: string) => void;
+  sendPayment: (from: string, to: string, amt: number, desc: string) => Promise<void>;
+  burstFraud: () => Promise<void>;
+  openAccount: (holder: string, email: string, currency?: string) => Promise<void>;
+  toggleAccount: (a: Account) => Promise<void>;
+  unblockAll: (acc: string) => Promise<void>;
 }
 
 const Ctx = createContext<PaymentStore | null>(null);
 
-const seedAccounts: Account[] = [
-  { id: "ACC-123", holder: "Yassine Bennani", balance: 25000, status: "ACTIVE" },
-  { id: "ACC-456", holder: "Salma El Idrissi", balance: 8000, status: "ACTIVE" },
-  { id: "ACC-789", holder: "Omar Tazi", balance: 1500, status: "ACTIVE" },
-];
-
-const seedRows: Array<[string, number, PaymentStatus, string]> = [
-  ["ACC-123", 450, "PROCESSED", "Facture 42"],
-  ["ACC-456", 1200, "PROCESSED", "Loyer"],
-  ["ACC-789", 2000, "FAILED", "Solde insuffisant"],
-  ["ACC-123", 80, "PROCESSED", "Café"],
-  ["ACC-456", 15, "DLT", "Erreur technique"],
-  ["ACC-789", 320, "PROCESSED", "Courses"],
-  ["ACC-123", 2100, "PROCESSED", "Virement Salaire"],
-  ["ACC-456", 45, "PENDING", "Abonnement streaming"],
-  ["ACC-123", 12.5, "PROCESSED", "Parking"],
-  ["ACC-789", 999.99, "FRAUD", "Montant douteux"],
-  ["ACC-456", 33, "DLT", "Format invalide"],
-  ["ACC-123", 560, "PROCESSED", "Facture télécom"],
-];
-
 export function PaymentsProvider({ children }: { children: ReactNode }) {
-  const [accounts, setAccounts] = useState<Account[]>(seedAccounts);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [feed, setFeed] = useState<Payment[]>([]);
   const [history, setHistory] = useState<Payment[]>([]);
   const [alerts, setAlerts] = useState<FraudAlert[]>([]);
-  const [figures, setFigures] = useState<Figures>(BASE_FIGURES);
+  const [figures, setFigures] = useState<Figures>(EMPTY_FIGURES);
   const [banner, setBanner] = useState<string | null>(null);
-  const feedLock = useRef(false);
-  const seeded = useRef(false);
+  const [ready, setReady] = useState(false);
+  const esRef = useRef<EventSource | null>(null);
+
+  const loadAccounts = useCallback(async () => {
+    const page = await api.accounts();
+    setAccounts(page.content.map(toAccount));
+  }, []);
+
+  const loadPayments = useCallback(async () => {
+    const page = await api.payments();
+    const items = page.content.map(toPayment);
+    setHistory((prev) => {
+      const merged = [...items, ...prev];
+      const seen = new Set<string>();
+      return merged
+        .filter((p) => (seen.has(p.ref) ? false : (seen.add(p.ref), true)))
+        .slice(0, HISTORY_LIMIT);
+    });
+    setFeed((prev) => {
+      const merged = [...items, ...prev];
+      const seen = new Set<string>();
+      return merged
+        .filter((p) => (seen.has(p.ref) ? false : (seen.add(p.ref), true)))
+        .slice(0, FEED_LIMIT);
+    });
+  }, []);
+
+  const loadFigures = useCallback(async () => {
+    const [s, f] = await Promise.all([api.paymentStats(), api.fraudStats()]);
+    setFigures({
+      count: s && typeof s.totalPayments === "number" ? s.totalPayments : 0,
+      amount: num(s?.totalAmount),
+      fraud: f?.rejectedCount ?? 0,
+      dlt: num(s?.paymentsByStatus?.DLT ?? 0),
+    });
+  }, []);
+
+  const loadFraud = useCallback(async () => {
+    const evaluations = await api.fraudEvaluations(true);
+    setAlerts(evaluations.map(toAlert));
+  }, []);
+
+  const refresh = useCallback(async () => {
+    const results = await Promise.allSettled([loadAccounts(), loadPayments(), loadFigures(), loadFraud()]);
+    const failed = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+    if (failed) throw failed.reason;
+  }, [loadAccounts, loadPayments, loadFigures, loadFraud]);
 
   useEffect(() => {
-    if (seeded.current) return;
-    seeded.current = true;
-    const items: Payment[] = seedRows.map((r, i) => ({
-      ref: mkRef(),
-      acc: r[0],
-      amt: r[1],
-      status: r[2],
-      desc: r[3],
-      time: now(),
-      ts: Date.now() - (seedRows.length - i) * 15000,
-    }));
-    setFeed(items);
-    setHistory(items);
-  }, []);
+    let cancelled = false;
+    if (ready) return;
+    (async () => {
+      try {
+        await refresh();
+      } catch (e) {
+        if (!cancelled) setBanner(e instanceof Error ? e.message : "Connexion à la passerelle impossible.");
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refresh, ready]);
 
-  const push = useCallback(
-    (acc: string, amt: number, status: PaymentStatus, desc: string, ts: number) => {
-      const item: Payment = { ref: mkRef(), acc, amt, status, desc, time: now(), ts };
-      setFeed((f) => [{ ...item, ts: Date.now() }, ...f].slice(0, 14));
-      setHistory((h) => [item, ...h]);
-      setFigures((fg) => ({
-        count: fg.count + 1,
-        amount: fg.amount + (status === "PROCESSED" ? amt : 0),
-        fraud: fg.fraud + (status === "FRAUD" ? 1 : 0),
-        dlt: fg.dlt + (status === "DLT" ? 1 : 0),
-      }));
-      return item;
-    },
-    []
-  );
-
-  const patchPayment = useCallback((ref: string, status: PaymentStatus, desc: string, amt: number) => {
-    setFeed((f) => f.map((p) => (p.ref === ref ? { ...p, status, desc } : p)));
-    setHistory((h) => h.map((p) => (p.ref === ref ? { ...p, status, desc } : p)));
-    if (status === "PROCESSED") {
-      setFigures((fg) => ({ ...fg, amount: fg.amount + amt }));
-    }
-  }, []);
-
-  const sendPayment = useCallback(
-    (acc: string, amt: number, desc: string) => {
-      feedLock.current = true;
-      const item = push(acc, amt, "PENDING", desc, Date.now());
-      window.setTimeout(() => {
-        const account = accounts.find((a) => a.id === acc);
-        let status: PaymentStatus = "PROCESSED";
-        let note = desc;
-        if (!account) {
-          status = "FAILED";
-          note = "Compte inconnu";
-        } else if (account.status === "BLOCKED") {
-          status = "FAILED";
-          note = "Compte bloqué";
-        } else if (account.balance < amt) {
-          status = "FAILED";
-          note = "Solde insuffisant";
-        } else {
-          account.balance -= amt;
-          status = "PROCESSED";
-          note = desc;
-          setAccounts((prev) => prev.map((a) => (a.id === acc ? { ...account } : a)));
-        }
-        patchPayment(item.ref, status, note, status === "PROCESSED" ? amt : 0);
-        feedLock.current = false;
-      }, 900);
-    },
-    [accounts, push, patchPayment]
-  );
-
-  const burstFraud = useCallback(() => {
-    const acc = "ACC-789";
-    const account = accounts.find((a) => a.id === acc);
-    if (!account) return;
-    if (account.status !== "ACTIVE") {
-      setAccounts((prev) => prev.map((a) => (a.id === acc ? { ...a, status: "ACTIVE" as const } : a)));
-    }
-    [0, 350, 700, 1050].forEach((delay, i) => {
-      window.setTimeout(() => {
-        const item = push(
-          acc,
-          10,
-          i === 3 ? "FRAUD" : "PROCESSED",
-          i === 3 ? "4 paiements en 60s" : "rafale",
-          Date.now()
-        );
-        if (i === 3) {
-          setAccounts((prev) =>
-            prev.map((a) => (a.id === acc ? { ...a, status: "BLOCKED" as const } : a))
-          );
-          setAlerts((prev) => [
-            { acc, tx: 4, ref: item.ref, time: new Date().toLocaleString("fr-MA") },
-            ...prev,
-          ]);
-          setBanner(`${acc} bloqué — 4 paiements en une minute`);
-        }
-      }, delay);
-    });
-  }, [accounts, push]);
-
-  const openAccount = useCallback((holder: string, balance: number, id?: string) => {
-    setAccounts((prev) => [
-      {
-        id: id?.trim().toUpperCase() || "ACC-" + Math.floor(100 + Math.random() * 900),
-        holder,
-        balance,
-        status: "ACTIVE" as const,
-      },
-      ...prev,
-    ]);
-  }, []);
-
-  const toggleAccount = useCallback((id: string) => {
-    setAccounts((prev) =>
-      prev.map((a) =>
-        a.id === id ? { ...a, status: a.status === "BLOCKED" ? "ACTIVE" : "BLOCKED" } : a
-      )
-    );
-  }, []);
-
-  const unblockAll = useCallback((acc: string) => {
-    setAccounts((prev) => prev.map((a) => (a.id === acc ? { ...a, status: "ACTIVE" as const } : a)));
-    setAlerts([]);
-    setBanner(null);
-  }, []);
-
+  // Récupération continue des données (comptes, paiements, stats, fraude)
   useEffect(() => {
     const id = window.setInterval(() => {
-      if (feedLock.current) return;
-      const random = accounts[Math.floor(Math.random() * accounts.length)];
-      if (!random || random.status === "BLOCKED") return;
-      const amt = Math.round((20 + Math.random() * 900) * 100) / 100;
-      const ok = random.balance >= amt;
-      if (ok) {
-        const updated = { ...random, balance: random.balance - amt };
-        setAccounts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
-      }
-      push(random.id, amt, ok ? "PROCESSED" : "FAILED", ok ? "virement" : "Solde insuffisant", Date.now());
-    }, 6500);
+      refresh().catch(() => {});
+    }, 6000);
     return () => window.clearInterval(id);
-  }, [accounts, push]);
+  }, [refresh]);
+
+  // Flux temps réel via SSE (passerelle → payment-service)
+  useEffect(() => {
+    let es = esRef.current;
+    if (!es) {
+      es = new EventSource(PAYMENTS_STREAM_URL);
+      esRef.current = es;
+    }
+    const onPayment = (ev: MessageEvent) => {
+      try {
+        const payload = JSON.parse(ev.data as string) as PaymentDto;
+        const item = toPayment(payload);
+        setFeed((f) => [item, ...f.filter((p) => p.ref !== item.ref)].slice(0, FEED_LIMIT));
+        setHistory((h) => [item, ...h.filter((p) => p.ref !== item.ref)].slice(0, HISTORY_LIMIT));
+        setFigures((fg) => ({ ...fg, count: fg.count + 1 }));
+      } catch {
+        // événement mal formé : ignoré
+      }
+    };
+    es.addEventListener("payment", onPayment);
+    return () => {
+      es.removeEventListener("payment", onPayment);
+      es.close();
+      esRef.current = null;
+    };
+  }, []);
+
+  const sendPayment = useCallback(async (from: string, to: string, amt: number, desc: string) => {
+    try {
+      const res = await api.transfer({
+        fromAccountNumber: from,
+        toAccountNumber: to,
+        amount: amt,
+        description: desc,
+      });
+      const item: Payment = {
+        ref: res.transferId,
+        acc: from,
+        amt: num(res.amount),
+        status: res.status as PaymentStatus,
+        desc: desc,
+        time: fmtTime(res.createdAt),
+        ts: res.createdAt ? new Date(res.createdAt).getTime() : Date.now(),
+      };
+      setFeed((f) => [item, ...f.filter((p) => p.ref !== item.ref)].slice(0, FEED_LIMIT));
+      setHistory((h) => [item, ...h.filter((p) => p.ref !== item.ref)].slice(0, HISTORY_LIMIT));
+      setFigures((fg) => ({ ...fg, count: fg.count + 1 }));
+    } catch (e) {
+      setBanner(e instanceof Error ? e.message : "Paiement refusé.");
+    }
+  }, []);
+
+  const burstFraud = useCallback(async () => {
+    const active = accounts.filter((a) => a.status === "ACTIVE");
+    const from = active[0];
+    const to = active.find((a) => a.id !== from?.id);
+    if (!from || !to) {
+      setBanner("Créez au moins deux comptes actifs pour lancer la simulation de rafale.");
+      return;
+    }
+    for (let i = 0; i < 4; i++) {
+      await sendPayment(from.id, to.id, 10, i === 3 ? "rafale" : "paiement en rafale");
+      await new Promise((r) => setTimeout(r, 700));
+    }
+  }, [accounts, sendPayment]);
+
+  const openAccount = useCallback(async (holder: string, email: string, currency = "MAD") => {
+    if (!holder.trim() || !email.trim()) {
+      setBanner("Titulaire et email sont requis pour ouvrir un compte.");
+      return;
+    }
+    try {
+      const created = await api.createAccount({
+        ownerName: holder.trim(),
+        ownerEmail: email.trim(),
+        currency: currency.trim().toUpperCase(),
+      });
+      setAccounts((prev) => [toAccount(created), ...prev]);
+    } catch (e) {
+      setBanner(e instanceof Error ? e.message : "Création de compte impossible.");
+    }
+  }, []);
+
+  const toggleAccount = useCallback(async (a: Account) => {
+    try {
+      const action = a.status === "BLOCKED" ? "unblock" : "block";
+      const updated = await api.setAccountStatus(a.uuid, action);
+      setAccounts((prev) => prev.map((x) => (x.uuid === updated.id ? toAccount(updated) : x)));
+    } catch (e) {
+      setBanner(e instanceof Error ? e.message : "Changement de statut impossible.");
+    }
+  }, []);
+
+  const unblockAll = useCallback(
+    async (acc: string) => {
+      const account = accounts.find((a) => a.id === acc);
+      if (account && account.status === "BLOCKED") {
+        try {
+          const updated = await api.setAccountStatus(account.uuid, "unblock");
+          setAccounts((prev) => prev.map((x) => (x.uuid === updated.id ? toAccount(updated) : x)));
+        } catch {
+          // l'actualisation périodique resynchronisera l'état réel
+        }
+      }
+      setAlerts((prev) => prev.filter((al) => al.acc !== acc));
+      setBanner(null);
+    },
+    [accounts]
+  );
 
   return (
     <Ctx.Provider
@@ -221,6 +276,7 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
         alerts,
         figures,
         banner,
+        ready,
         clearBanner: () => setBanner(null),
         sendPayment,
         burstFraud,

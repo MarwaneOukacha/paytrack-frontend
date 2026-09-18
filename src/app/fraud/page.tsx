@@ -23,10 +23,10 @@ export default function FraudPage() {
           const account = accounts.find((a) => a.id === al.acc);
           const isBlocked = account?.status === "BLOCKED";
           return (
-            <div key={al.acc} className="alert-card">
+            <div key={al.ref} className="alert-card">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span className="mono text-[15px] font-semibold">{al.acc}</span>
-                <span className="text-[13.5px] text-red">{al.tx} paiements en 60s</span>
+                <span className="text-[13.5px] text-red">{al.reason}</span>
                 <span className="mono ml-auto text-xs text-muted">{al.time}</span>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3">

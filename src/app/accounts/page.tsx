@@ -1,22 +1,37 @@
 "use client";
 
-import { useState } from "react";
 import { Lock, Unlock } from "lucide-react";
 import { usePayments } from "@/components/payments-provider";
 import { fmtMAD } from "@/lib/format";
+import { ACCOUNT_STATUS_LABELS } from "@/lib/types";
+import type { AccountStatus } from "@/lib/types";
 import clsx from "clsx";
+import { useState } from "react";
+
+const STATUS_COLORS: Record<AccountStatus, string> = {
+  ACTIVE: "text-green",
+  INACTIVE: "text-amber",
+  BLOCKED: "text-red",
+  CLOSED: "text-red",
+};
+
+const STATUS_DOT: Record<AccountStatus, string> = {
+  ACTIVE: "bg-green",
+  INACTIVE: "bg-amber",
+  BLOCKED: "bg-red",
+  CLOSED: "bg-red",
+};
 
 export default function AccountsPage() {
   const { accounts, openAccount, toggleAccount } = usePayments();
   const [holder, setHolder] = useState("");
-  const [balance, setBalance] = useState("1000");
-  const [manualId, setManualId] = useState("");
+  const [email, setEmail] = useState("");
 
   const submit = () => {
-    if (!holder.trim()) return;
-    openAccount(holder.trim(), parseFloat(balance) || 0, manualId);
+    if (!holder.trim() || !email.trim()) return;
+    openAccount(holder.trim(), email.trim());
     setHolder("");
-    setManualId("");
+    setEmail("");
   };
 
   return (
@@ -35,15 +50,6 @@ export default function AccountsPage() {
           </div>
           <div className="flex flex-col gap-3.5 p-5">
             <label className="grid">
-              <span className="lbl">Numéro (vide = généré)</span>
-              <input
-                className="field"
-                placeholder="ACC-321"
-                value={manualId}
-                onChange={(e) => setManualId(e.target.value)}
-              />
-            </label>
-            <label className="grid">
               <span className="lbl">Titulaire</span>
               <input
                 className="field"
@@ -53,23 +59,22 @@ export default function AccountsPage() {
               />
             </label>
             <label className="grid">
-              <span className="lbl">Solde d&apos;ouverture en MAD</span>
+              <span className="lbl">Email</span>
               <input
-                type="number"
+                type="email"
                 className="field"
-                value={balance}
-                onChange={(e) => setBalance(e.target.value)}
+                placeholder="nadia@paytrack.io"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </label>
             <button type="button" onClick={submit} className="btn">
               Ouvrir le compte
             </button>
-            {manualId.trim().toUpperCase() && (
-              <p className="hint">
-                id annoncé :{" "}
-                <span className="font-semibold text-ink">{manualId.trim().toUpperCase()}</span>
-              </p>
-            )}
+            <p className="hint">
+              La devise est automatiquement <span className="font-semibold text-ink">MAD</span> et le solde débute à
+              zéro.
+            </p>
           </div>
         </div>
 
@@ -91,33 +96,29 @@ export default function AccountsPage() {
             <tbody>
               {accounts.map((a) => {
                 const blocked = a.status === "BLOCKED";
+                const canToggle = a.status === "ACTIVE" || a.status === "INACTIVE" || a.status === "BLOCKED";
                 return (
-                  <tr key={a.id}>
+                  <tr key={a.uuid}>
                     <td className="mono">{a.id}</td>
                     <td>{a.holder}</td>
                     <td className="right mono">{fmtMAD(a.balance)} MAD</td>
                     <td>
-                      <span
-                        className={clsx(
-                          "inline-flex items-center gap-1.5 text-xs font-medium",
-                          blocked ? "text-red" : "text-green"
-                        )}
-                      >
-                        <span
-                          className={clsx("size-1.5 rounded-full", blocked ? "bg-red" : "bg-green")}
-                        />
-                        {blocked ? "Bloqué" : "Actif"}
+                      <span className={clsx("inline-flex items-center gap-1.5 text-xs font-medium", STATUS_COLORS[a.status])}>
+                        <span className={clsx("size-1.5 rounded-full", STATUS_DOT[a.status])} />
+                        {ACCOUNT_STATUS_LABELS[a.status]}
                       </span>
                     </td>
                     <td className="right">
-                      <button
-                        type="button"
-                        onClick={() => toggleAccount(a.id)}
-                        className="btn-quiet flex items-center gap-1.5"
-                      >
-                        {blocked ? <Unlock size={12} /> : <Lock size={12} />}
-                        {blocked ? "Débloquer" : "Bloquer"}
-                      </button>
+                      {canToggle && (
+                        <button
+                          type="button"
+                          onClick={() => void toggleAccount(a)}
+                          className="btn-quiet flex items-center gap-1.5"
+                        >
+                          {blocked ? <Unlock size={12} /> : <Lock size={12} />}
+                          {blocked ? "Débloquer" : "Bloquer"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
