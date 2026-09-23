@@ -94,6 +94,31 @@ export interface FraudStatsDto {
   rejectedCount: number;
 }
 
+export type FraudRuleType = "HIGH_AMOUNT" | "REJECTION_RATE" | "VELOCITY";
+
+export interface FraudConfigDto {
+  id: string;
+  ruleType: FraudRuleType;
+  enabled: boolean;
+  threshold: number;
+  windowMinutes?: number;
+  description?: string;
+  updatedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateFraudConfigDto {
+  ruleType: FraudRuleType;
+  enabled?: boolean;
+  threshold: number;
+  windowMinutes?: number;
+  description?: string;
+  updatedBy?: string;
+}
+
+export type UpdateFraudConfigDto = Partial<CreateFraudConfigDto>;
+
 // ---------------------------------------------------------------------------
 // Client HTTP vers la passerelle
 // ---------------------------------------------------------------------------
@@ -153,4 +178,25 @@ export const api = {
       `/api/fraud/evaluations?rejectedOnly=${rejectedOnly}&limit=${limit}`
     ),
   fraudStats: () => request<FraudStatsDto>("/api/fraud/stats"),
+  fraudConfigs: () => request<FraudConfigDto[]>("/api/fraud/configs"),
+  createFraudConfig: (body: CreateFraudConfigDto) =>
+    request<FraudConfigDto>("/api/fraud/configs", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateFraudConfig: (id: string, body: UpdateFraudConfigDto) =>
+    request<FraudConfigDto>(`/api/fraud/configs/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteFraudConfig: (id: string) =>
+    request<void>(`/api/fraud/configs/${id}`, { method: "DELETE" }),
+  toggleFraudConfig: (id: string) =>
+    request<FraudConfigDto>(`/api/fraud/configs/${id}/toggle`, {
+      method: "POST",
+    }),
+  resetFraudConfigs: () =>
+    request<FraudConfigDto[]>("/api/fraud/configs/defaults", {
+      method: "POST",
+    }),
 };

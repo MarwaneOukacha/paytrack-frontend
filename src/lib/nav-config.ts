@@ -40,7 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "workflows",
     label: "Workflows",
     icon: Workflow,
-    items: [{ href: "/soon/fraud-rules", label: "Règles de fraude", icon: Shield }],
+    items: [{ href: "/fraud-configuration", label: "Règles de fraude", icon: Shield }],
   },
   {
     id: "account",

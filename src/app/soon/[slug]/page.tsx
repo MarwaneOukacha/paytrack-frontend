@@ -9,10 +9,6 @@ const MODULES: Record<string, { title: string; desc: string }> = {
     title: "Produits",
     desc: "Catalogue des produits financiers proposés et leurs règles.",
   },
-  "fraud-rules": {
-    title: "Règles de fraude",
-    desc: "Seuils, fenêtres glissantes et actions automatiques par type de compte.",
-  },
   limits: {
     title: "Plafonds & configs compte",
     desc: "Plafonds de paiement, devises autorisées, paramètres par défaut à l'ouverture.",
