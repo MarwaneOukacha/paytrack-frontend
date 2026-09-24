@@ -20,7 +20,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <div
           className={clsx(
-            "fixed inset-0 z-40 bg-[rgba(15,23,42,0.45)] lg:hidden",
+            "fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[6px] lg:hidden",
             drawerOpen ? "block" : "hidden"
           )}
           onClick={closeDrawer}

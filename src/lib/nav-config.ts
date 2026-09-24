@@ -47,9 +47,9 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Configs compte",
     icon: ClipboardList,
     items: [
-      { href: "/soon/cards", label: "Cartes bancaires", icon: CreditCard },
+      { href: "/cards", label: "Cartes bancaires", icon: CreditCard },
       { href: "/soon/products", label: "Produits", icon: Package },
-      { href: "/soon/limits", label: "Plafonds & configs", icon: Gauge },
+      { href: "/limits", label: "Plafonds & configs", icon: Gauge },
     ],
   },
   {
@@ -57,8 +57,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Configs système",
     icon: Settings,
     items: [
-      { href: "/soon/integrations", label: "Intégrations", icon: Plug },
-      { href: "/soon/settings", label: "Paramètres", icon: Settings },
+      { href: "/settings", label: "Intégrations", icon: Plug },
+      { href: "/settings", label: "Paramètres", icon: Settings },
     ],
   },
   {

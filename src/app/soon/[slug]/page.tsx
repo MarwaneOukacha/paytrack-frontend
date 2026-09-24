@@ -1,25 +1,9 @@
 export const dynamicParams = false;
 
 const MODULES: Record<string, { title: string; desc: string }> = {
-  cards: {
-    title: "Cartes bancaires",
-    desc: "Émission, activation et plafonds de cartes liées à un compte PayTrack.",
-  },
   products: {
     title: "Produits",
     desc: "Catalogue des produits financiers proposés et leurs règles.",
-  },
-  limits: {
-    title: "Plafonds & configs compte",
-    desc: "Plafonds de paiement, devises autorisées, paramètres par défaut à l'ouverture.",
-  },
-  integrations: {
-    title: "Intégrations",
-    desc: "Connexions vers les systèmes bancaires externes : ISO 20022, USSD, SMPP.",
-  },
-  settings: {
-    title: "Paramètres",
-    desc: "Seuils de fraude, plafonds de paiement, origines autorisées.",
   },
   logs: {
     title: "Journaux API",

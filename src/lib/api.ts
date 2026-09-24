@@ -1,4 +1,4 @@
-import type { AccountStatus, PaymentStatus } from "@/lib/types";
+import type { AccountStatus, CardNetwork, CardStatus, CardType, ConfigCategory, PaymentStatus } from "@/lib/types";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8085";
@@ -94,6 +94,37 @@ export interface FraudStatsDto {
   rejectedCount: number;
 }
 
+export interface LimitConfigDto {
+  defaultCurrency: string;
+  defaultSingleTransactionLimit: number;
+  defaultDailyLimit: number;
+  defaultMonthlyLimit: number;
+  maxSingleTransactionLimit: number;
+  maxDailyLimit: number;
+  maxMonthlyLimit: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type UpdateLimitConfigDto = Partial<LimitConfigDto>;
+
+export interface SystemSettingDto {
+  id: string;
+  key: string;
+  value: string;
+  description?: string;
+  category: ConfigCategory;
+  updatedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UpdateSystemSettingDto {
+  value: string;
+  description?: string;
+  updatedBy?: string;
+}
+
 export type FraudRuleType = "HIGH_AMOUNT" | "REJECTION_RATE" | "VELOCITY";
 
 export interface FraudConfigDto {
@@ -118,6 +149,58 @@ export interface CreateFraudConfigDto {
 }
 
 export type UpdateFraudConfigDto = Partial<CreateFraudConfigDto>;
+
+export interface CardDto {
+  id: string;
+  cardNumber: string;
+  lastFourDigits: string;
+  cardholderName: string;
+  accountId: string;
+  accountNumber: string;
+  network: CardNetwork;
+  type: CardType;
+  expiryMonth: string;
+  expiryYear: string;
+  status: CardStatus;
+  singleTransactionLimit?: number;
+  dailyLimit?: number;
+  monthlyLimit?: number;
+  currency?: string;
+  issuedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateCardDto {
+  accountId: string;
+  type: CardType;
+  network: CardNetwork;
+  singleTransactionLimit?: number;
+  dailyLimit?: number;
+  monthlyLimit?: number;
+  currency?: string;
+}
+
+export type UpdateCardDto = Partial<CreateCardDto>;
+
+export type CardStatusAction =
+  | "activate"
+  | "deactivate"
+  | "block"
+  | "unblock"
+  | "expire"
+  | "lost"
+  | "stolen";
+
+export interface CardNumberDto {
+  cardId: string;
+  cardNumber: string;
+  cvv: string;
+  expiryMonth: string;
+  expiryYear: string;
+  network: CardNetwork;
+  type: CardType;
+}
 
 // ---------------------------------------------------------------------------
 // Client HTTP vers la passerelle
@@ -168,6 +251,23 @@ export const api = {
     }),
   setAccountStatus: (id: string, action: "block" | "unblock") =>
     request<AccountDto>(`/api/accounts/${id}/${action}`, { method: "POST" }),
+  cards: () => request<PageDto<CardDto>>("/api/cards?size=100"),
+  createCard: (body: CreateCardDto) =>
+    request<CardDto>("/api/cards", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  setCardStatus: (id: string, action: CardStatusAction) =>
+    request<CardDto>(`/api/cards/${id}/${action}`, { method: "POST" }),
+  updateCard: (id: string, body: UpdateCardDto) =>
+    request<CardDto>(`/api/cards/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  revealCardNumber: (id: string) =>
+    request<CardNumberDto>(`/api/cards/${id}/number`),
+  deleteCard: (id: string) =>
+    request<void>(`/api/cards/${id}`, { method: "DELETE" }),
   transfer: (body: TransferRequestDto) =>
     request<TransferResponseDto>("/api/payments/transfer", {
       method: "POST",
@@ -197,6 +297,25 @@ export const api = {
     }),
   resetFraudConfigs: () =>
     request<FraudConfigDto[]>("/api/fraud/configs/defaults", {
+      method: "POST",
+    }),
+  limitConfig: () => request<LimitConfigDto>("/api/configs/limits"),
+  updateLimitConfig: (body: UpdateLimitConfigDto) =>
+    request<LimitConfigDto>("/api/configs/limits", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  systemSettings: (category?: ConfigCategory) =>
+    request<SystemSettingDto[]>(
+      `/api/configs/system${category ? `?category=${category}` : ""}`
+    ),
+  updateSystemSetting: (key: string, body: UpdateSystemSettingDto) =>
+    request<SystemSettingDto>(`/api/configs/system/${key}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  resetSystemConfigs: () =>
+    request<SystemSettingDto[]>("/api/configs/system/defaults", {
       method: "POST",
     }),
 };
