@@ -5,13 +5,12 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
 import {
-  PAYMENTS_STREAM_URL,
   api,
+  subscribeToPayments,
   type AccountDto,
   type FraudEvaluationDto,
   type PaymentDto,
@@ -86,7 +85,6 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   const [figures, setFigures] = useState<Figures>(EMPTY_FIGURES);
   const [banner, setBanner] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const esRef = useRef<EventSource | null>(null);
 
   const loadAccounts = useCallback(async () => {
     const page = await api.accounts();
@@ -158,30 +156,14 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id);
   }, [refresh]);
 
-  // Flux temps réel via SSE (passerelle → payment-service)
+  // Flux temps réel via SSE authentifié (passerelle → payment-service)
   useEffect(() => {
-    let es = esRef.current;
-    if (!es) {
-      es = new EventSource(PAYMENTS_STREAM_URL);
-      esRef.current = es;
-    }
-    const onPayment = (ev: MessageEvent) => {
-      try {
-        const payload = JSON.parse(ev.data as string) as PaymentDto;
-        const item = toPayment(payload);
-        setFeed((f) => [item, ...f.filter((p) => p.ref !== item.ref)].slice(0, FEED_LIMIT));
-        setHistory((h) => [item, ...h.filter((p) => p.ref !== item.ref)].slice(0, HISTORY_LIMIT));
-        setFigures((fg) => ({ ...fg, count: fg.count + 1 }));
-      } catch {
-        // événement mal formé : ignoré
-      }
-    };
-    es.addEventListener("payment", onPayment);
-    return () => {
-      es.removeEventListener("payment", onPayment);
-      es.close();
-      esRef.current = null;
-    };
+    return subscribeToPayments((payload) => {
+      const item = toPayment(payload);
+      setFeed((f) => [item, ...f.filter((p) => p.ref !== item.ref)].slice(0, FEED_LIMIT));
+      setHistory((h) => [item, ...h.filter((p) => p.ref !== item.ref)].slice(0, HISTORY_LIMIT));
+      setFigures((fg) => ({ ...fg, count: fg.count + 1 }));
+    });
   }, []);
 
   const sendPayment = useCallback(async (from: string, to: string, amt: number, desc: string) => {

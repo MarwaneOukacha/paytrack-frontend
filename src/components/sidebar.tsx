@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { ChevronRight, PanelLeftClose, PanelLeftOpen, type LucideIcon } from "lucide-react";
 import { NAV_GROUPS, NAV_TOP, type NavItem } from "@/lib/nav-config";
 import { ThemeToggle } from "./theme-toggle";
+import { UserMenu } from "./user-menu";
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -139,16 +140,19 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
         <div className="flex flex-col gap-0.5">{NAV_GROUPS.map(groupButton)}</div>
       </div>
 
-      <div className="relative mt-4 flex items-center justify-center gap-2 border-t border-line bg-page/40 p-3">
-        <ThemeToggle />
-        <button
-          type="button"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? "Déplier le menu" : "Replier le menu"}
-          className="hidden size-9 place-items-center rounded-full border border-line bg-card text-muted shadow-card transition-colors hover:border-faint hover:text-ink lg:grid"
-        >
-          {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-        </button>
+      <div className="relative mt-4 flex flex-col gap-3 border-t border-line bg-page/40 p-3">
+        <UserMenu collapsed={collapsed} />
+        <div className="flex items-center justify-center gap-2">
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? "Déplier le menu" : "Replier le menu"}
+            className="hidden size-9 place-items-center rounded-full border border-line bg-card text-muted shadow-card transition-colors hover:border-faint hover:text-ink lg:grid"
+          >
+            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+          </button>
+        </div>
       </div>
     </aside>
   );

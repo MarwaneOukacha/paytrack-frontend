@@ -1,14 +1,32 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 import { PaymentsProvider } from "./payments-provider";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./topbar";
+import { AuthLoading, useAuth } from "./auth-provider";
+
+const PUBLIC_PATHS = ["/login"];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const pathname = usePathname();
+  const router = useRouter();
+  const { status } = useAuth();
+  const publicRoute = PUBLIC_PATHS.includes(pathname);
+
+  useEffect(() => {
+    if (status === "unauthenticated" && !publicRoute) {
+      const returnUrl = `${pathname}${window.location.search}`;
+      router.replace(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
+    }
+  }, [pathname, publicRoute, router, status]);
+
+  if (publicRoute) return <>{children}</>;
+  if (status !== "authenticated") return <AuthLoading />;
 
   return (
     <PaymentsProvider>

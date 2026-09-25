@@ -1,9 +1,17 @@
 import type { AccountStatus, CardNetwork, CardStatus, CardType, ConfigCategory, PaymentStatus } from "@/lib/types";
+import { getAccessToken, notifyUnauthorized } from "@/lib/oidc";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8085";
 
 export const PAYMENTS_STREAM_URL = `${API_BASE_URL}/api/payments/stream`;
+
+function authHeaders(extra?: HeadersInit) {
+  const headers = new Headers(extra);
+  const token = getAccessToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return headers;
+}
 
 // ---------------------------------------------------------------------------
 // DTOs renvoyés par la passerelle
@@ -216,13 +224,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
       ...init,
+      headers: authHeaders({ "Content-Type": "application/json", ...init?.headers }),
     });
   } catch {
     throw new Error(
       "Impossible de joindre la passerelle PayTrack, vérifiez qu'elle tourne sur le port 8085."
     );
+  }
+
+  if (res.status === 401) {
+    notifyUnauthorized();
   }
 
   if (!res.ok) {
@@ -319,3 +331,83 @@ export const api = {
       method: "POST",
     }),
 };
+
+const STREAM_RETRY_MS = 3000;
+
+function parseSseChunk(chunk: string) {
+  const data = chunk
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trim())
+    .join("\n");
+
+  if (!data) return null;
+
+  try {
+    return JSON.parse(data) as PaymentDto;
+  } catch {
+    return null;
+  }
+}
+
+export function subscribeToPayments(onPayment: (payment: PaymentDto) => void) {
+  let closed = false;
+  let unauthorized = false;
+  let controller: AbortController | null = null;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const connect = async () => {
+    if (closed) return;
+    controller = new AbortController();
+
+    try {
+      const res = await fetch(PAYMENTS_STREAM_URL, {
+        headers: authHeaders({ Accept: "text/event-stream" }),
+        cache: "no-store",
+        signal: controller.signal,
+      });
+
+      if (res.status === 401) {
+        unauthorized = true;
+        notifyUnauthorized();
+        return;
+      }
+
+      if (!res.ok || !res.body) {
+        throw new Error(`Flux indisponible (${res.status})`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (!closed) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split(/\r?\n\r?\n/);
+        buffer = events.pop() ?? "";
+
+        for (const event of events) {
+          const payment = parseSseChunk(event);
+          if (payment) onPayment(payment);
+        }
+      }
+    } catch (error) {
+      if (closed || (error as Error).name === "AbortError") return;
+    } finally {
+      if (!closed && !unauthorized) {
+        retryTimer = setTimeout(() => void connect(), STREAM_RETRY_MS);
+      }
+    }
+  };
+
+  void connect();
+
+  return () => {
+    closed = true;
+    controller?.abort();
+    if (retryTimer) clearTimeout(retryTimer);
+  };
+}
